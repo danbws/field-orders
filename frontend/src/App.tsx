@@ -7,6 +7,8 @@ interface CartLine {
   quantity: number;
 }
 
+const sectionLabel = "mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400";
+
 export default function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [products, setProducts] = useState<Product[]>([]);
@@ -25,7 +27,7 @@ export default function App() {
       const n = await flushOutbox();
       setPending(loadOutbox());
       if (n > 0) {
-        setToast(`Synced ${n} order${n > 1 ? "s" : ""} ✓`);
+        setToast(`Synced ${n} order${n > 1 ? "s" : ""}`);
         refreshSynced();
       }
     } catch {
@@ -88,49 +90,57 @@ export default function App() {
   const cartTotal = cart.reduce((s, l) => s + l.quantity * l.product.price, 0);
 
   return (
-    <div className="mx-auto min-h-screen max-w-md bg-slate-50 pb-24">
-      <header className="sticky top-0 z-10 flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
-        <h1 className="font-bold">📦 Field Orders</h1>
-        <div className="flex items-center gap-2 text-xs">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col border-x border-slate-200 bg-slate-50">
+      <header className="sticky top-0 z-10 flex h-14 items-center justify-between bg-slate-900 px-4 text-white">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded bg-indigo-500 text-xs font-bold">
+            FO
+          </div>
+          <span className="text-sm font-semibold tracking-wide">Field Orders</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px]">
           {pending.length > 0 && (
-            <span className="rounded-full bg-amber-400 px-2 py-0.5 font-semibold text-amber-950">
-              {pending.length} pending sync
+            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 font-medium text-amber-300">
+              {pending.length} queued
             </span>
           )}
           <span
             data-testid="conn"
-            className={`rounded-full px-2 py-0.5 font-semibold ${
-              online ? "bg-emerald-400 text-emerald-950" : "bg-rose-400 text-rose-950"
-            }`}
+            className="flex items-center gap-1.5 rounded-full bg-slate-800 px-2 py-0.5 font-medium"
           >
-            {online ? "online" : "offline"}
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${online ? "bg-emerald-400" : "bg-rose-400"}`}
+            />
+            <span className={online ? "text-emerald-300" : "text-rose-300"}>
+              {online ? "online" : "offline"}
+            </span>
           </span>
         </div>
       </header>
 
       {toast && (
-        <div className="mx-4 mt-3 rounded-lg bg-emerald-100 px-3 py-2 text-sm text-emerald-800">
+        <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
           {toast}
         </div>
       )}
 
       <section className="px-4 pt-4">
-        <h2 className="mb-2 text-sm font-semibold text-slate-500">NEW ORDER</h2>
+        <h2 className={sectionLabel}>New order</h2>
         <input
           value={customer}
           onChange={(e) => setCustomer(e.target.value)}
           placeholder="Customer name"
-          className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2"
+          className="mb-3 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
         <div className="grid grid-cols-2 gap-2">
           {products.map((p) => (
             <button
               key={p.id}
               onClick={() => addToCart(p)}
-              className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm active:bg-sky-50"
+              className="rounded-md border border-slate-200 bg-white p-3 text-left transition-colors active:border-indigo-400 active:bg-indigo-50"
             >
               <p className="text-sm font-medium text-slate-800">{p.name}</p>
-              <p className="text-xs text-slate-500">
+              <p className="mt-0.5 text-xs tabular-nums text-slate-500">
                 {p.sku} · ${p.price.toFixed(2)}
               </p>
             </button>
@@ -138,62 +148,82 @@ export default function App() {
         </div>
 
         {cart.length > 0 && (
-          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            {cart.map((l) => (
-              <div key={l.product.id} className="flex justify-between py-1 text-sm">
-                <span className="text-slate-700">
-                  {l.product.name} × {l.quantity}
-                </span>
-                <span className="font-medium text-slate-800">
-                  ${(l.quantity * l.product.price).toFixed(2)}
-                </span>
+          <div className="mt-3 overflow-hidden rounded-md border border-slate-200 bg-white">
+            <div className="px-3 py-2">
+              {cart.map((l) => (
+                <div key={l.product.id} className="flex justify-between py-1 text-sm">
+                  <span className="text-slate-700">
+                    {l.product.name} <span className="tabular-nums text-slate-400">× {l.quantity}</span>
+                  </span>
+                  <span className="font-medium tabular-nums text-slate-800">
+                    ${(l.quantity * l.product.price).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+              <div className="mt-1 flex justify-between border-t border-slate-100 pt-2 text-sm font-semibold">
+                <span>Total</span>
+                <span className="tabular-nums">${cartTotal.toFixed(2)}</span>
               </div>
-            ))}
-            <div className="mt-2 flex justify-between border-t border-slate-100 pt-2 text-sm font-bold">
-              <span>Total</span>
-              <span>${cartTotal.toFixed(2)}</span>
             </div>
             <button
               onClick={saveOrder}
               disabled={!customer}
-              className="mt-3 w-full rounded-lg bg-sky-600 py-2.5 font-medium text-white disabled:opacity-40"
+              className="w-full bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
             >
-              Save order {online ? "" : "(offline)"}
+              Save order{online ? "" : " · offline"}
             </button>
           </div>
         )}
       </section>
 
-      <section className="px-4 pt-6">
-        <h2 className="mb-2 text-sm font-semibold text-slate-500">ORDERS</h2>
-        <ul className="space-y-2">
+      <section className="px-4 pb-8 pt-6">
+        <h2 className={sectionLabel}>Orders</h2>
+        <ul className="space-y-1.5">
           {pending.map((o) => (
             <li
               key={o.client_id}
-              className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"
+              className="flex items-stretch overflow-hidden rounded-md border border-slate-200 bg-white"
             >
-              <div className="flex justify-between">
-                <span className="font-medium text-slate-800">{o.customer}</span>
-                <span className="text-xs font-semibold text-amber-700">⏳ waiting for sync</span>
+              <div className="w-1 bg-amber-400" />
+              <div className="flex-1 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-800">{o.customer}</span>
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    Queued
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs tabular-nums text-slate-500">
+                  {o.items.length} item(s) · saved{" "}
+                  {new Date(o.created_offline_at).toLocaleTimeString()}
+                </p>
               </div>
-              <p className="text-xs text-slate-500">
-                {o.items.length} item(s) · saved {new Date(o.created_offline_at).toLocaleTimeString()}
-              </p>
             </li>
           ))}
           {synced.map((o) => (
-            <li key={o.client_id} className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
-              <div className="flex justify-between">
-                <span className="font-medium text-slate-800">{o.customer}</span>
-                <span className="text-xs font-semibold text-emerald-600">✓ synced</span>
+            <li
+              key={o.client_id}
+              className="flex items-stretch overflow-hidden rounded-md border border-slate-200 bg-white"
+            >
+              <div className="w-1 bg-emerald-500" />
+              <div className="flex-1 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-800">{o.customer}</span>
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Synced
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs tabular-nums text-slate-500">
+                  {o.items.length} item(s) · ${o.total.toFixed(2)}
+                </p>
               </div>
-              <p className="text-xs text-slate-500">
-                {o.items.length} item(s) · ${o.total.toFixed(2)}
-              </p>
             </li>
           ))}
           {pending.length === 0 && synced.length === 0 && (
-            <p className="text-sm text-slate-400">No orders yet — tap a product to start one.</p>
+            <p className="py-8 text-center text-sm text-slate-400">
+              No orders yet — tap a product to start one.
+            </p>
           )}
         </ul>
       </section>

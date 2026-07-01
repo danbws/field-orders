@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getOrders, getProducts, type Product, type SyncedOrder } from "./api";
-import { enqueue, flushOutbox, loadOutbox, type OutboxItem } from "./outbox";
+import { enqueue, flushOutbox, loadOutbox, removeFromOutbox, type OutboxItem } from "./outbox";
 
 interface CartLine {
   product: Product;
@@ -85,6 +85,12 @@ export default function App() {
     setCart([]);
     setToast(online ? "Order saved — syncing…" : "Order saved offline — will sync later");
     if (online) sync();
+  }
+
+  function discardQueued(clientId: string) {
+    removeFromOutbox(clientId);
+    setPending(loadOutbox());
+    setToast("Queued order removed");
   }
 
   const cartTotal = cart.reduce((s, l) => s + l.quantity * l.product.price, 0);
@@ -193,10 +199,18 @@ export default function App() {
                     Queued
                   </span>
                 </div>
-                <p className="mt-0.5 text-xs tabular-nums text-slate-500">
-                  {o.items.length} item(s) · saved{" "}
-                  {new Date(o.created_offline_at).toLocaleTimeString()}
-                </p>
+                <div className="mt-0.5 flex items-center justify-between">
+                  <p className="text-xs tabular-nums text-slate-500">
+                    {o.items.length} item(s) · saved{" "}
+                    {new Date(o.created_offline_at).toLocaleTimeString()}
+                  </p>
+                  <button
+                    onClick={() => discardQueued(o.client_id)}
+                    className="text-xs font-medium text-rose-500 hover:text-rose-700"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             </li>
           ))}

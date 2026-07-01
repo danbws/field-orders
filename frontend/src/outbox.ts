@@ -49,6 +49,13 @@ export function enqueue(order: Omit<OutboxItem, "client_id" | "created_offline_a
   return item;
 }
 
+/** Drop a queued order that hasn't synced yet — e.g. the rep saved it by
+ * mistake. Safe because it only lives on the device until the server acks it;
+ * once synced it leaves the outbox and can no longer be removed here. */
+export function removeFromOutbox(clientId: string): void {
+  saveOutbox(loadOutbox().filter((o) => o.client_id !== clientId));
+}
+
 /** Push the queue to the server. Returns how many were acknowledged. */
 export async function flushOutbox(): Promise<number> {
   const pending = loadOutbox();

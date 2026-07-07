@@ -61,3 +61,33 @@ def test_partial_batch_with_known_and_new_orders(client):
     assert by_id[known["client_id"]] == "duplicate"
     assert by_id[new["client_id"]] == "created"
     assert len(client.get("/api/orders").json()) == 2
+
+
+def test_summary_by_rep_totals_and_ranks(client):
+    def payload(rep, customer, qty):
+        return {
+            "client_id": str(uuid.uuid4()),
+            "customer": customer,
+            "rep_name": rep,
+            "created_offline_at": "2026-06-12T09:30:00Z",
+            "items": [
+                {"product_sku": "FAB-001", "product_name": "Cotton Jersey 160g",
+                 "quantity": qty, "unit_price": 10.0},
+            ],
+        }
+
+    # Ana: 2 orders (30+50 units × $10 = $800). Bruno: 1 order (20 × $10 = $200).
+    client.post("/api/sync", json={"orders": [
+        payload("Ana", "Hanier Textiles", 30),
+        payload("Ana", "Zion Fabrics", 50),
+        payload("Bruno", "Saltorelli Group", 20),
+    ]})
+
+    rows = client.get("/api/summary/by-rep").json()
+    by = {r["rep_name"]: r for r in rows}
+    assert by["Ana"]["order_count"] == 2
+    assert by["Ana"]["total"] == 800.0
+    assert by["Bruno"]["order_count"] == 1
+    assert by["Bruno"]["total"] == 200.0
+    # Top seller first
+    assert rows[0]["rep_name"] == "Ana"

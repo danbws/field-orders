@@ -41,6 +41,12 @@ class SyncResponse(BaseModel):
     results: list[SyncResultEntry]
 
 
+class RepSummary(BaseModel):
+    rep_name: str
+    order_count: int
+    total: float
+
+
 class ItemOut(ItemIn):
     model_config = ConfigDict(from_attributes=True)
 

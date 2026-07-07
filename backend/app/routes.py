@@ -4,7 +4,14 @@ from sqlalchemy.orm import Session, selectinload
 
 from .database import get_db
 from .models import Order, OrderItem, Product
-from .schemas import OrderOut, ProductOut, SyncRequest, SyncResponse, SyncResultEntry
+from .schemas import (
+    OrderOut,
+    ProductOut,
+    RepSummary,
+    SyncRequest,
+    SyncResponse,
+    SyncResultEntry,
+)
 
 router = APIRouter(prefix="/api", tags=["sync"])
 
@@ -32,6 +39,27 @@ def list_orders(db: Session = Depends(get_db)):
     return db.scalars(
         select(Order).options(selectinload(Order.items)).order_by(Order.synced_at.desc())
     ).all()
+
+
+@router.get("/summary/by-rep", response_model=list[RepSummary])
+def summary_by_rep(db: Session = Depends(get_db)):
+    """Sales per field rep — order count and billed value, top seller first.
+
+    The number a sales manager wants after a day in the field: who brought in
+    what. Aggregated in Python so it reuses Order.total (which sums the items).
+    """
+    orders = db.scalars(select(Order).options(selectinload(Order.items))).all()
+    buckets: dict[str, dict] = {}
+    for o in orders:
+        bucket = buckets.setdefault(o.rep_name, {"order_count": 0, "total": 0.0})
+        bucket["order_count"] += 1
+        bucket["total"] += o.total
+    rows = [
+        RepSummary(rep_name=name, order_count=b["order_count"], total=round(b["total"], 2))
+        for name, b in buckets.items()
+    ]
+    rows.sort(key=lambda r: r.total, reverse=True)
+    return rows
 
 
 @router.post("/sync", response_model=SyncResponse)

@@ -29,12 +29,15 @@ class OrderIn(BaseModel):
 
 
 class SyncRequest(BaseModel):
-    orders: list[OrderIn] = Field(min_length=1)
+    # Cap the batch so the open endpoint can't be handed an unbounded payload.
+    orders: list[OrderIn] = Field(min_length=1, max_length=500)
 
 
 class SyncResultEntry(BaseModel):
     client_id: str
-    result: Literal["created", "duplicate"]
+    result: Literal["created", "duplicate", "rejected"]
+    # Set only when result == "rejected" (e.g. "unknown_sku: FAB-999").
+    reason: str | None = None
 
 
 class SyncResponse(BaseModel):

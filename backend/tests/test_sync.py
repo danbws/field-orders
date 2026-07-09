@@ -76,7 +76,9 @@ def test_summary_by_rep_totals_and_ranks(client):
             ],
         }
 
-    # Ana: 2 orders (30+50 units × $10 = $800). Bruno: 1 order (20 × $10 = $200).
+    # Pricing is server-authoritative: FAB-001 is $18.90 in the catalog, so the
+    # client-sent $10.0 is ignored. Ana: 2 orders (30+50 units × $18.90 =
+    # $1512.00). Bruno: 1 order (20 × $18.90 = $378.00).
     client.post("/api/sync", json={"orders": [
         payload("Ana", "Hanier Textiles", 30),
         payload("Ana", "Zion Fabrics", 50),
@@ -86,8 +88,44 @@ def test_summary_by_rep_totals_and_ranks(client):
     rows = client.get("/api/summary/by-rep").json()
     by = {r["rep_name"]: r for r in rows}
     assert by["Ana"]["order_count"] == 2
-    assert by["Ana"]["total"] == 800.0
+    assert by["Ana"]["total"] == 1512.0
     assert by["Bruno"]["order_count"] == 1
-    assert by["Bruno"]["total"] == 200.0
+    assert by["Bruno"]["total"] == 378.0
     # Top seller first
     assert rows[0]["rep_name"] == "Ana"
+
+
+def test_sync_prices_from_catalog_not_from_the_device(client):
+    """Server-authoritative pricing: a rep sends a bogus $0.01 for a real SKU;
+    the stored line and total must reflect the CATALOG price ($18.90), not $0.01."""
+    order = order_payload()
+    order["items"] = [
+        {"product_sku": "FAB-001", "product_name": "Totally Free Fabric",
+         "quantity": 100, "unit_price": 0.01},
+    ]
+    resp = client.post("/api/sync", json={"orders": [order]})
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["result"] == "created"
+
+    stored = client.get("/api/orders").json()[0]
+    assert stored["items"][0]["unit_price"] == 18.90         # not 0.01
+    assert stored["items"][0]["product_name"] == "Cotton Jersey 160g"  # not client name
+    assert stored["total"] == 100 * 18.90                    # priced from the catalog
+
+
+def test_sync_rejects_unknown_sku_and_persists_nothing(client):
+    """An order referencing a SKU that isn't in the catalog is rejected whole —
+    nothing is inserted, and the reason names the offending SKU."""
+    order = order_payload()
+    order["items"] = [
+        {"product_sku": "FAB-999", "product_name": "Phantom Fabric",
+         "quantity": 5, "unit_price": 9.99},
+    ]
+    resp = client.post("/api/sync", json={"orders": [order]})
+    assert resp.status_code == 200
+    entry = resp.json()["results"][0]
+    assert entry["result"] == "rejected"
+    assert "FAB-999" in entry["reason"]
+
+    # Nothing persisted for the rejected order.
+    assert client.get("/api/orders").json() == []

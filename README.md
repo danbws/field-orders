@@ -1,12 +1,32 @@
-# 📦 Field Orders
+# 📦 RouteLine
 
-An **offline-first order-taking app** for field sales reps — modeled on a system I built for
-industrial clients in Brazil, where reps visit factories in areas with patchy mobile coverage
-and "no signal" can't mean "no sale".
+**Offline order capture for food & beverage distributors and DSD route reps.**
+Take the order in the cooler, not the parking lot — every order captured offline,
+priced right, and on the manager's dashboard the second there's a bar of signal.
+
+> **No signal is not the same as no sale.**
 
 [![CI](https://github.com/danbws/field-orders/actions/workflows/ci.yml/badge.svg)](https://github.com/danbws/field-orders/actions/workflows/ci.yml)
 
 ![App screenshot](docs/app.png)
+
+## What it is / who it's for
+
+RouteLine is an **offline-first order-taking app** for field sales reps who take
+reorders where there's no signal — walk-in coolers, stockrooms, loading docks.
+It's built for **small regional food & beverage distributors and DSD operations**
+(craft beverage, coffee roasters, specialty foods, bakery, produce) running
+**3–25 reps** who today work off paper pads, texts, and spreadsheets re-keyed into
+QuickBooks.
+
+**Status:** the offline sync engine (device-minted UUIDs + idempotent batch sync)
+and **server-authoritative pricing** are done. The multi-tenant SaaS shell (auth,
+orgs, roles), Stripe billing, and a real installable **PWA** (service worker +
+IndexedDB, replacing the current `localStorage` demo store) are on the roadmap —
+see [`docs/PRODUCT.md`](docs/PRODUCT.md).
+
+The full product brief — positioning, ICP, pricing, brand — lives in
+[`docs/PRODUCT.md`](docs/PRODUCT.md).
 
 ## How offline-first works here
 
@@ -26,9 +46,13 @@ UUID minted on device  ──►  outbox flushed in batch  ──►  created/du
 2. **The outbox pattern.** Saved orders go into a local queue. The UI shows them immediately
    (`⏳ waiting for sync`), because for the rep the order *exists* — sync is plumbing.
 3. **Idempotent sync.** When connectivity returns, the queue is pushed as a batch to
-   `POST /api/sync`. The server answers `created` or `duplicate` per order. A retry after a
-   dropped connection can never double-book — `duplicate` is also success, and the outbox
-   clears either way.
+   `POST /api/sync`. The server answers `created`, `duplicate`, or `rejected` per order. A
+   retry after a dropped connection can never double-book — `duplicate` is also success, and
+   the outbox clears either way.
+5. **Server-authoritative pricing.** On sync, the server prices every line from the catalog
+   — it overwrites the device-sent `unit_price`/`product_name` (a rep can't fat-finger or
+   discount a line) and `rejects` any order that references an unknown SKU, persisting
+   nothing for it. The catalog is the source of truth.
 4. **Catalog caching.** The product list is cached locally on every successful fetch, so the
    rep can keep composing orders with stale-but-useful data while offline.
 

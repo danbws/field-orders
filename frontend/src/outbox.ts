@@ -69,9 +69,11 @@ export async function flushOutbox(): Promise<number> {
   if (!resp.ok) throw new Error(`Sync failed: ${resp.status}`);
 
   const { results } = (await resp.json()) as {
-    results: { client_id: string; result: "created" | "duplicate" }[];
+    results: { client_id: string; result: "created" | "duplicate" | "rejected"; reason?: string }[];
   };
-  // 'duplicate' is also success: the server already has it. Clear both.
+  // 'duplicate' is also success: the server already has it. 'rejected' (e.g. an
+  // unknown SKU) will never succeed on retry, so it's cleared too rather than
+  // looping the outbox forever. Every acknowledged id leaves the queue.
   const acked = new Set(results.map((r) => r.client_id));
   saveOutbox(pending.filter((p) => !acked.has(p.client_id)));
   return acked.size;

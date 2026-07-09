@@ -3,14 +3,24 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import Base, engine
-from .routes import router
+from .database import Base, engine, get_db
+from .routes import router, seed_products
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Demo-friendly bootstrap; swap for Alembic migrations in real deployments.
     Base.metadata.create_all(engine)
+    # Seed the catalog once at startup so GET /products stays side-effect-free.
+    # Resolve the DB session through the (possibly overridden) get_db dependency
+    # so tests seed their own database rather than the real engine.
+    db_factory = app.dependency_overrides.get(get_db, get_db)
+    db_gen = db_factory()
+    db = next(db_gen)
+    try:
+        seed_products(db)
+    finally:
+        db_gen.close()
     yield
 
 
